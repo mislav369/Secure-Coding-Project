@@ -2,6 +2,7 @@ package com.opentext.appsec.demo.model;
 
 import jakarta.persistence.*;
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * User entity with intentional security issues.
@@ -19,6 +20,7 @@ public class User {
     private String username;
 
     @Schema(description = "Password stored in plain text (INSECURE - demo only)")
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;  // Storing password in plain text - security vulnerability
 
     @Schema(description = "Email address")

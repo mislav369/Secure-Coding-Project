@@ -13,6 +13,8 @@ import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 
+import org.springframework.web.util.HtmlUtils;
+
 /**
  * User controller with intentional security vulnerabilities.
  */
@@ -117,15 +119,7 @@ public class UserController {
         return ResponseEntity.status(401).body("Authentication failed");
     }
 
-    /**
-     * Get database credentials - exposes sensitive data.
-     */
-    @Operation(summary = "Get database credentials (insecure - demo)", security = {})
-    @GetMapping("/debug/credentials")
-    public String getCredentials() {
-        // Exposing sensitive credentials
-        return userService.getDatabaseCredentials();
-    }
+
 
     /**
      * Logout: blacklist the provided token until its expiry.
@@ -158,7 +152,7 @@ public class UserController {
         // Return a longer, more interesting welcome HTML for the demo
         String html = "<html><body>" +
                 "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:0 auto;\">" +
-                "<h1 style=\"color:#1f2937;\">Welcome, " + name + "!</h1>" +
+                "<h1 style=\"color:#1f2937;\">Welcome, " + HtmlUtils.htmlEscape(name) + "!</h1>" +
                 "<p style=\"color:#374151;\">Glad to see you back. Here's a quick summary of your demo account and recent activity — useful for demoing dashboards and data visualizations.</p>" +
                 "<ul style=\"color:#374151;\">" +
                 "<li><strong>Payments:</strong> You have sample payment methods (credit cards and PayPal) seeded for demo purposes.</li>" +

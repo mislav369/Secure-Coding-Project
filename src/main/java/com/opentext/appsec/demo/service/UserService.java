@@ -33,8 +33,9 @@ public class UserService {
      */
     public User findUserByUsername(String username) {
         // SQL Injection vulnerability - concatenating user input directly
-        String sql = "SELECT * FROM users WHERE username = '" + username + "'";
+        String sql = "SELECT * FROM users WHERE username = :username";
         Query query = entityManager.createNativeQuery(sql, User.class);
+        query.setParameter("username", username);
         List<User> results = query.getResultList();
         return results.isEmpty() ? null : results.get(0);
     }
@@ -90,10 +91,5 @@ public class UserService {
         return query.getResultList();
     }
 
-    /**
-     * Get database credentials - exposing sensitive data.
-     */
-    public String getDatabaseCredentials() {
-        return "Username: " + DB_USERNAME + ", Password: " + DB_PASSWORD;
-    }
+
 }
