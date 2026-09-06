@@ -60,20 +60,16 @@ public class UserController {
         return userService.getAllUsers();
     }
 
-    /**
-     * Search users with SQL injection vulnerability.
-     */
-    @Operation(summary = "Search users (insecure - demo)", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
+
+    @Operation(summary = "Search users", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/search")
     public List<User> searchUsers(@Parameter(description = "Search query (unsanitized, demonstrates SQLi)") @RequestParam String query) {
         // Passes unsanitized input to service - SQL Injection
         return userService.searchUsers(query);
     }
 
-    /**
-     * Find user by username with SQL injection vulnerability.
-     */
-    @Operation(summary = "Find user by username (insecure - demo)", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
+
+    @Operation(summary = "Find user by username", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/find")
     public ResponseEntity<User> findUser(@Parameter(description = "Username to find (unsanitized, demonstrates SQLi)") @RequestParam String username) {
         // SQL Injection vulnerability
@@ -84,11 +80,8 @@ public class UserController {
         return ResponseEntity.notFound().build();
     }
 
-    /**
-     * Create a new user.
-     * Stores password in plain text.
-     */
-        @Operation(summary = "Create a new user (stores plaintext password - INSECURE)",
+
+        @Operation(summary = "Create a new user)",
                 requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "User object to create"))
         @PostMapping
         public User createUser(
@@ -111,10 +104,8 @@ public class UserController {
             return userService.createUser(user);
         }
 
-    /**
-     * Update an existing user (demo only).
-     */
-    @Operation(summary = "Update user (demo)")
+
+    @Operation(summary = "Update user")
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(
             @PathVariable Long id,
@@ -140,10 +131,8 @@ public class UserController {
         return ResponseEntity.ok(existing);
     }
 
-    /**
-     * Authenticate user with weak authentication.
-     */
-    @Operation(summary = "Authenticate user (weak, demo only)", security = {})
+
+    @Operation(summary = "Authenticate user", security = {})
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(
             @RequestParam String username,
@@ -255,10 +244,8 @@ public class UserController {
         //return userService.searchUsersVulnerable(query);
     //}
 
-    /**
-     * Reflect user input without sanitization - XSS vulnerability.
-     */
-    @Operation(summary = "Welcome page (reflects input - XSS demo)", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
+
+    @Operation(summary = "Welcome page", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/welcome")
     public String welcome(@Parameter(description = "Name to welcome (not escaped)") @RequestParam String name) {
         // Cross-Site Scripting (XSS) vulnerability - no HTML escaping
@@ -283,10 +270,8 @@ public class UserController {
 
     }
 
-    /**
-     * Display user profile with XSS vulnerability.
-     */
-    @Operation(summary = "User profile (reflects message - XSS demo)", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
+
+    @Operation(summary = "User profile", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/{id}/profile")
     public String getUserProfile(@Parameter(description = "User id") @PathVariable Long id,
                                  @Parameter(description = "Optional message reflected into HTML (not escaped)") @RequestParam(required = false) String message) {
