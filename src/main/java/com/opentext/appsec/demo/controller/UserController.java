@@ -248,6 +248,11 @@ public class UserController {
                 "Logged out and tokens revoked");
     }
 
+    //@GetMapping("/search-vuln")
+    //public List<User> searchUsersVulnerable(@RequestParam String query) {
+        //return userService.searchUsersVulnerable(query);
+    //}
+
     /**
      * Reflect user input without sanitization - XSS vulnerability.
      */

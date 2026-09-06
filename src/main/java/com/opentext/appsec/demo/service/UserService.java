@@ -34,18 +34,22 @@ public class UserService {
 
 
 
-    /**
-     * Find user by username using SQL injection vulnerability.
-     * Vulnerable to SQL Injection attack.
-     */
+
     public User findUserByUsername(String username) {
-        // SQL Injection vulnerability - concatenating user input directly
+
         String sql = "SELECT * FROM users WHERE username = :username";
         Query query = entityManager.createNativeQuery(sql, User.class);
         query.setParameter("username", username);
         List<User> results = query.getResultList();
         return results.isEmpty() ? null : results.get(0);
     }
+
+    //public List<User> searchUsersVulnerable(String searchTerm) {
+        //String sql = "SELECT * FROM users WHERE username LIKE '%" + searchTerm + "%'"
+               // + " OR email LIKE '%" + searchTerm + "%'";
+        //Query query = entityManager.createNativeQuery(sql, User.class);
+        //return query.getResultList();
+    //}
 
     /**
      * Authenticate user with weak password hashing.
