@@ -1,6 +1,8 @@
 package com.opentext.appsec.demo.controller;
 
-
+import com.opentext.appsec.demo.dto.RefreshRequest;
+import com.opentext.appsec.demo.dto.TokenResponse;
+import com.opentext.appsec.demo.model.RefreshToken;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,8 @@ import com.opentext.appsec.demo.dto.UpdateUserRequest;
 import com.opentext.appsec.demo.security.JwtUtil;
 import com.opentext.appsec.demo.security.TokenBlacklistService;
 
+import com.opentext.appsec.demo.security.RefreshTokenService;
+
 /**
  * User controller with intentional security vulnerabilities.
  */
@@ -34,14 +38,17 @@ public class UserController {
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final TokenBlacklistService blacklistService;
+    private final RefreshTokenService refreshTokenService;
 
     public UserController(
             UserService userService,
             JwtUtil jwtUtil,
-            TokenBlacklistService blacklistService) {
+            TokenBlacklistService blacklistService,
+            RefreshTokenService refreshTokenService) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.blacklistService = blacklistService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     /**
@@ -138,16 +145,57 @@ public class UserController {
      */
     @Operation(summary = "Authenticate user (weak, demo only)", security = {})
     @PostMapping("/login")
-    public ResponseEntity<String> login(@Parameter(description = "Username") @RequestParam String username,
-                                        @Parameter(description = "Password (plaintext) - INSECURE") @RequestParam String password) {
-        // Weak authentication logic
-        boolean authenticated = userService.authenticateUser(username, password);
-        if (authenticated) {
-            // INSECURE (intentional): generate a JWT with a hard-coded secret for demo purposes
-            String token = jwtUtil.generateToken(username);
-            return ResponseEntity.ok(token);
+    public ResponseEntity<TokenResponse> login(
+            @RequestParam String username,
+            @RequestParam String password) {
+
+        boolean authenticated =
+                userService.authenticateUser(username, password);
+
+        if (!authenticated) {
+            return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.status(401).body("Authentication failed");
+
+        String accessToken = jwtUtil.generateToken(username);
+
+        String refreshToken = refreshTokenService
+                .createForLogin(username)
+                .getToken();
+
+        return ResponseEntity.ok(
+                new TokenResponse(
+                        accessToken,
+                        refreshToken,
+                        "Bearer"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponse> refresh(
+            @RequestBody RefreshRequest request) {
+
+        if (request == null
+                || request.refreshToken() == null
+                || request.refreshToken().isBlank()) {
+
+            return ResponseEntity.status(401).build();
+        }
+
+        try {
+            RefreshToken rotated =
+                    refreshTokenService.rotateToken(
+                            request.refreshToken());
+
+            String accessToken = jwtUtil.generateToken(
+                    rotated.getUsername());
+
+            return ResponseEntity.ok(
+                    new TokenResponse(
+                            accessToken,
+                            rotated.getToken(),
+                            "Bearer"));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(401).build();
+        }
     }
 
 
@@ -155,22 +203,49 @@ public class UserController {
     /**
      * Logout: blacklist the provided token until its expiry.
      */
-    @Operation(summary = "Logout (blacklist token)")
+    @Operation(
+            summary = "Logout and revoke tokens",
+            security = {
+                    @io.swagger.v3.oas.annotations.security.SecurityRequirement(
+                            name = "bearerAuth")
+            })
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+    public ResponseEntity<String> logout(
+            @RequestHeader(
+                    value = "Authorization",
+                    required = false) String authHeader,
+            @RequestBody(required = false) RefreshRequest request) {
+
+        if (authHeader != null
+                && authHeader.startsWith("Bearer ")) {
+
+            String accessToken = authHeader.substring(7);
+
             try {
-                long exp = jwtUtil.getExpirationMillis(token);
-                // Blacklist token until its expiry
-                blacklistService.blacklistToken(token, exp);
-                return ResponseEntity.ok("Logged out") ;
-            } catch (Exception ex) {
-                logger.warn("Failed to parse token during logout", ex);
-                return ResponseEntity.status(400).body("Invalid token") ;
+                long expiration =
+                        jwtUtil.getExpirationMillis(accessToken);
+
+                blacklistService.blacklistToken(
+                        accessToken,
+                        expiration);
+
+            } catch (Exception exception) {
+                logger.warn(
+                        "Failed to parse token during logout",
+                        exception);
             }
         }
-        return ResponseEntity.badRequest().body("Missing Authorization header") ;
+
+        if (request != null
+                && request.refreshToken() != null
+                && !request.refreshToken().isBlank()) {
+
+            refreshTokenService.revokeFamilyByToken(
+                    request.refreshToken());
+        }
+
+        return ResponseEntity.ok(
+                "Logged out and tokens revoked");
     }
 
     /**

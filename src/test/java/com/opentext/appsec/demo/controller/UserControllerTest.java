@@ -20,6 +20,8 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.opentext.appsec.demo.security.RefreshTokenService;
+
 class UserControllerTest {
 
     @Mock
@@ -34,13 +36,17 @@ class UserControllerTest {
     @Mock
     private TokenBlacklistService blacklistService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
         controller = new UserController(
                 userService,
                 jwtUtil,
-                blacklistService
+                blacklistService,
+                refreshTokenService
         );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();

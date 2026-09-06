@@ -10,6 +10,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import jakarta.servlet.http.HttpServletResponse;
 
 // INSECURE (intentional): Minimal security configuration that enforces JWT on /api/** endpoints.
 @Configuration
@@ -37,8 +38,15 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/api/**", "/h2-console/**")
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) ->
+                                response.sendError(
+                                        HttpServletResponse.SC_UNAUTHORIZED,
+                                        "Unauthorized")
+                        )
+                )
                 .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/users/login", "/api/users/debug/credentials").permitAll()
+                    .requestMatchers("/api/users/login", "/api/users/refresh", "/api/users/debug/credentials").permitAll()
                     .requestMatchers("/api/auth/entra/exchange").permitAll()
                     // Allow anonymous registration
                     .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
