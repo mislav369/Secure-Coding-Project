@@ -1,6 +1,6 @@
 const API_BASE = '/api'
 
-async function request(path, method = 'GET', body, token) {
+async function request(path, body, token, method = 'GET') {
   const headers = {}
   if (body) headers['Content-Type'] = 'application/json'
 

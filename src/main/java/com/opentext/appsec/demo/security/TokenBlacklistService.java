@@ -1,12 +1,12 @@
 package com.opentext.appsec.demo.security;
 
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 // Simple in-memory token blacklist for demo purposes.
-@Component
+@Service
 public class TokenBlacklistService {
     // token -> expiryMillis
     private final Map<String, Long> blacklist = new ConcurrentHashMap<>();

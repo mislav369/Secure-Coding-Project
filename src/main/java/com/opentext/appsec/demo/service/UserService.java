@@ -1,6 +1,6 @@
 package com.opentext.appsec.demo.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.stereotype.Service;
 
 import com.opentext.appsec.demo.model.User;
@@ -8,8 +8,10 @@ import com.opentext.appsec.demo.repository.UserRepository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
-import java.security.MessageDigest;
+
 import java.util.List;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * User service with intentional security vulnerabilities.
@@ -17,15 +19,20 @@ import java.util.List;
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final EntityManager entityManager;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private EntityManager entityManager;
+    public UserService(
+            UserRepository userRepository,
+            EntityManager entityManager,
+            PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.entityManager = entityManager;
+        this.passwordEncoder = passwordEncoder;
+    }
 
-    // Hardcoded database credentials - security vulnerability
-    private static final String DB_USERNAME = "admin";
-    private static final String DB_PASSWORD = "P@ssw0rd123!";
+
 
     /**
      * Find user by username using SQL injection vulnerability.
@@ -45,32 +52,25 @@ public class UserService {
      * Uses MD5 which is cryptographically broken.
      */
     public boolean authenticateUser(String username, String password) {
-        try {
-            // Weak cryptography - MD5 is broken and should not be used
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(password.getBytes());
-            StringBuilder sb = new StringBuilder();
-            for (byte b : digest) {
-                sb.append(String.format("%02x", b));
-            }
-            String hashedPassword = sb.toString();
+        User user = userRepository.findByUsername(username);
 
-            User user = userRepository.findByUsername(username);
-            if (user != null) {
-                // Comparing plain text password - another vulnerability
-                return user.getPassword().equals(password);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();  // Exposing stack trace - information disclosure
-        }
-        return false;
+        return user != null
+                && passwordEncoder.matches(password, user.getPassword());
     }
 
     /**
      * Create a new user.
      */
     public User createUser(User user) {
-        // Storing password in plain text - security vulnerability
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        return userRepository.save(user);
+    }
+
+    public User updateUser(User user, String newPassword) {
+        if (newPassword != null && !newPassword.isBlank()) {
+            user.setPassword(passwordEncoder.encode(newPassword));
+        }
+
         return userRepository.save(user);
     }
 
@@ -85,9 +85,15 @@ public class UserService {
      * Search users with SQL injection vulnerability.
      */
     public List<User> searchUsers(String searchTerm) {
-        // SQL Injection vulnerability
-        String sql = "SELECT * FROM users WHERE username LIKE '%" + searchTerm + "%' OR email LIKE '%" + searchTerm + "%'";
+        String sql = """
+            SELECT * FROM users
+            WHERE username LIKE :searchTerm
+               OR email LIKE :searchTerm
+            """;
+
         Query query = entityManager.createNativeQuery(sql, User.class);
+        query.setParameter("searchTerm", "%" + searchTerm + "%");
+
         return query.getResultList();
     }
 

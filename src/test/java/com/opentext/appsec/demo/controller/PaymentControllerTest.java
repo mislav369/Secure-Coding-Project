@@ -1,15 +1,15 @@
 package com.opentext.appsec.demo.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.opentext.appsec.demo.model.Payment;
 import com.opentext.appsec.demo.repository.PaymentRepository;
-import com.opentext.appsec.demo.repository.UserRepository;
+
 import com.opentext.appsec.demo.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.test.util.ReflectionTestUtils;
+
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,23 +27,20 @@ class PaymentControllerTest {
     @Mock
     private PaymentRepository paymentRepository;
 
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
+        @Mock
     private TransactionRepository transactionRepository;
 
     private PaymentController controller;
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper = new ObjectMapper();
+
 
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
-        controller = new PaymentController();
-        ReflectionTestUtils.setField(controller, "paymentRepository", paymentRepository);
-        ReflectionTestUtils.setField(controller, "userRepository", userRepository);
-        ReflectionTestUtils.setField(controller, "transactionRepository", transactionRepository);
+        controller = new PaymentController(
+                paymentRepository,
+                transactionRepository
+        );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
@@ -61,7 +58,7 @@ class PaymentControllerTest {
 
     @Test
     void createPayment_returnsSaved() throws Exception {
-        Payment input = new Payment(2L, "PAYPAL", null, null, null, "bob@paypal", "ACTIVE");
+
         Payment saved = new Payment(2L, "PAYPAL", null, null, null, "bob@paypal", "ACTIVE");
         saved.setId(5L);
         when(paymentRepository.save(any(Payment.class))).thenReturn(saved);

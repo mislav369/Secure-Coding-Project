@@ -39,6 +39,14 @@ sbom_file = os.environ["SBOM_FILE"]
 auth_token = base64.b64encode(f"{username}:{password}".encode()).decode()
 auth_headers = {"Accept": "application/json", "Authorization": f"Basic {auth_token}"}
 
+WAIVER_MARKER_KEYS = {
+    "waived",
+    "waivedwithautowaiver",
+    "waivetime",
+}
+
+DEFAULT_WAIVER_COMMENT = "Waived in Sonatype IQ"
+
 
 def get_json(url: str) -> dict:
     req = urllib.request.Request(url, headers=auth_headers)
@@ -60,23 +68,24 @@ def extract_cve_ids(value) -> list[str]:
     return list(dict.fromkeys(match.upper() for match in matches))
 
 
+def is_waiver_field(key, value) -> bool:
+    """Return True when a field represents an active waiver."""
+    normalized_key = str(key).lower()
+    return normalized_key in WAIVER_MARKER_KEYS and bool(value)
+
+
 def has_waiver_marker(value) -> bool:
     """Return True if Sonatype waiver markers appear anywhere in the value."""
     if isinstance(value, dict):
-        for key, nested in value.items():
-            normalized_key = str(key).lower()
-            if normalized_key in ("waived", "waivedwithautowaiver", "waivetime"):
-                if normalized_key == "waivetime":
-                    if nested:
-                        return True
-                elif bool(nested):
-                    return True
-            if has_waiver_marker(nested):
-                return True
-    elif isinstance(value, list):
-        for nested in value:
-            if has_waiver_marker(nested):
-                return True
+        return any(
+            is_waiver_field(key, nested)
+            or has_waiver_marker(nested)
+            for key, nested in value.items()
+        )
+
+    if isinstance(value, list):
+        return any(has_waiver_marker(nested) for nested in value)
+
     return False
 
 
@@ -123,7 +132,7 @@ for report_id in report_ids[:5]:
             for violation in component.get("violations", []):
                 if not (violation.get("waived", False) or violation.get("waivedWithAutoWaiver", False) or has_waiver_marker(violation)):
                     continue
-                waiver_comment = violation.get("waiverComment", "") or "Waived in Sonatype IQ"
+                waiver_comment = violation.get("waiverComment", "") or DEFAULT_WAIVER_COMMENT
                 # Extract CVE IDs from any condition field Sonatype provides.
                 cve_ids = set()
                 for constraint in violation.get("constraints", []):
@@ -160,7 +169,7 @@ for report_id in report_ids[:5]:
                 cve_ids = extract_cve_ids(issue.get("reference", ""))
                 for cve_id in extract_cve_ids(issue):
                     cve_ids.add(cve_id)
-                waiver_comment = issue.get("customData", {}).get("remediation", "") or "Waived in Sonatype IQ"
+                waiver_comment = issue.get("customData", {}).get("remediation", "") or DEFAULT_WAIVER_COMMENT
                 for cve_id in cve_ids:
                     waived_cves.append(
                         {
@@ -191,7 +200,7 @@ for report_id in report_ids[:5]:
                 cve_ids = extract_cve_ids(issue.get("reference", ""))
                 for cve_id in extract_cve_ids(issue):
                     cve_ids.add(cve_id)
-                waiver_comment = issue.get("customData", {}).get("remediation", "") or "Waived in Sonatype IQ"
+                waiver_comment = issue.get("customData", {}).get("remediation", "") or DEFAULT_WAIVER_COMMENT
                 for cve_id in cve_ids:
                     waived_cves.append(
                         {
@@ -248,7 +257,7 @@ for vuln in sbom.get("vulnerabilities", []):
     if cve_id in waived_cve_ids and "analysis" not in vuln:
         comment = next(
             (e["comment"] for e in waived_cves if e["cve_id"] == cve_id),
-            "Waived in Sonatype IQ",
+            DEFAULT_WAIVER_COMMENT,
         )
         vuln["analysis"] = {
             "state": "not_affected",

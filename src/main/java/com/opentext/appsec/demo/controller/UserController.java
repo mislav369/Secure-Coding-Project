@@ -1,6 +1,6 @@
 package com.opentext.appsec.demo.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +15,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 
 import org.springframework.web.util.HtmlUtils;
 
+import com.opentext.appsec.demo.dto.CreateUserRequest;
+
+import com.opentext.appsec.demo.dto.UpdateUserRequest;
+
+import com.opentext.appsec.demo.security.JwtUtil;
+import com.opentext.appsec.demo.security.TokenBlacklistService;
+
 /**
  * User controller with intentional security vulnerabilities.
  */
@@ -24,14 +31,18 @@ public class UserController {
 
     private static final Log logger = LogFactory.getLog(UserController.class);
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+    private final JwtUtil jwtUtil;
+    private final TokenBlacklistService blacklistService;
 
-    @Autowired
-    private com.opentext.appsec.demo.security.JwtUtil jwtUtil;
-
-    @Autowired
-    private com.opentext.appsec.demo.security.TokenBlacklistService blacklistService;
+    public UserController(
+            UserService userService,
+            JwtUtil jwtUtil,
+            TokenBlacklistService blacklistService) {
+        this.userService = userService;
+        this.jwtUtil = jwtUtil;
+        this.blacklistService = blacklistService;
+    }
 
     /**
      * Get all users.
@@ -73,14 +84,23 @@ public class UserController {
         @Operation(summary = "Create a new user (stores plaintext password - INSECURE)",
                 requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "User object to create"))
         @PostMapping
-        public User createUser(@RequestBody(required = false) User user) {
-            if (user == null) {
-                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Empty request body");
+        public User createUser(
+                @RequestBody(required = false) CreateUserRequest request) {
+
+            if (request == null) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Empty request body"
+                );
             }
 
-            // INSECURE (intentional): stores user passwords in plain text for demo purposes.
-            // Secure alternative: hash+salt passwords (e.g., BCrypt) before persisting and never log raw passwords.
-            if (user.getRole() == null) user.setRole("USER");
+            User user = new User(
+                    request.username(),
+                    request.password(),
+                    request.email(),
+                    "USER"
+            );
+
             return userService.createUser(user);
         }
 
@@ -89,15 +109,26 @@ public class UserController {
      */
     @Operation(summary = "Update user (demo)")
     @PutMapping("/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User updated) {
-        User existing = userService.getAllUsers().stream().filter(u -> u.getId().equals(id)).findFirst().orElse(null);
-        if (existing == null) return ResponseEntity.notFound().build();
-        // INSECURE (demo): allow updating email and password directly
-        existing.setEmail(updated.getEmail());
-        existing.setPassword(updated.getPassword());
-        existing.setRole(updated.getRole());
-        // Do not change username in this demo
-        // Save via userService
+    public ResponseEntity<User> updateUser(
+            @PathVariable Long id,
+            @RequestBody UpdateUserRequest request) {
+
+        User existing = userService.getAllUsers()
+                .stream()
+                .filter(user -> user.getId().equals(id))
+                .findFirst()
+                .orElse(null);
+
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        existing.setEmail(request.email());
+
+        if (request.password() != null && !request.password().isBlank()) {
+            existing.setPassword(request.password());
+        }
+
         userService.createUser(existing);
         return ResponseEntity.ok(existing);
     }
@@ -150,7 +181,7 @@ public class UserController {
     public String welcome(@Parameter(description = "Name to welcome (not escaped)") @RequestParam String name) {
         // Cross-Site Scripting (XSS) vulnerability - no HTML escaping
         // Return a longer, more interesting welcome HTML for the demo
-        String html = "<html><body>" +
+        return "<html><body>" +
                 "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:0 auto;\">" +
                 "<h1 style=\"color:#1f2937;\">Welcome, " + HtmlUtils.htmlEscape(name) + "!</h1>" +
                 "<p style=\"color:#374151;\">Glad to see you back. Here's a quick summary of your demo account and recent activity — useful for demoing dashboards and data visualizations.</p>" +
@@ -167,7 +198,7 @@ public class UserController {
                 "</ol>" +
                 "<p style=\"color:#6b7280; font-size:0.9em; margin-top:12px;\">(This welcome message is intentionally reflective and not escaped to demonstrate XSS findings during security scans.)</p>" +
                 "</div></body></html>";
-        return html;
+
     }
 
     /**

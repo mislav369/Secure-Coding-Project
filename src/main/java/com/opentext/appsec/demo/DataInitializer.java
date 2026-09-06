@@ -1,5 +1,6 @@
 package com.opentext.appsec.demo;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +15,8 @@ import com.opentext.appsec.demo.repository.UserRepository;
 import com.opentext.appsec.demo.repository.PaymentRepository;
 import com.opentext.appsec.demo.repository.TransactionRepository;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 /**
  * Data initializer for demo purposes.
  */
@@ -22,15 +25,28 @@ public class DataInitializer {
 
     private static final Log logger = LogFactory.getLog(DataInitializer.class);
 
+    private static final String ACTIVE_STATUS = "ACTIVE";
+
+    @Value("${seed.admin.password}")
+    private String adminPassword;
+
+    @Value("${seed.user.password}")
+    private String userPassword;
+
+    @Value("${seed.john.password}")
+    private String johnPassword;
+
+    @Value("${seed.alice.password}")
+    private String alicePassword;
+
     @Bean
     @Order(1)
-    CommandLineRunner initDatabase(UserRepository repository) {
+    CommandLineRunner initDatabase(UserRepository repository, PasswordEncoder passwordEncoder) {
         return args -> {
-            // Storing passwords in plain text - security vulnerability
-            repository.save(new User("admin", "admin123", "admin@example.com", "ADMIN"));
-            repository.save(new User("user", "password", "user@example.com", "USER"));
-            repository.save(new User("john", "john123", "john@example.com", "USER"));
-            repository.save(new User("alice", "alice456", "alice@example.com", "USER"));
+            repository.save(new User("admin", passwordEncoder.encode(adminPassword), "admin@example.com", "ADMIN"));
+            repository.save(new User("user",  passwordEncoder.encode(userPassword),  "user@example.com",  "USER"));
+            repository.save(new User("john",  passwordEncoder.encode(johnPassword),  "john@example.com",  "USER"));
+            repository.save(new User("alice", passwordEncoder.encode(alicePassword), "alice@example.com", "USER"));
         };
     }
 
@@ -42,43 +58,80 @@ public class DataInitializer {
             try {
                 User user = userRepository.findByUsername("user");
                 if (user != null) {
-                    paymentRepository.save(new Payment(user.getId(), "CREDIT_CARD", "4111111111111111", "12/25", "123", null, "ACTIVE"));
+                    paymentRepository.save(new Payment(user.getId(), "CREDIT_CARD", "4111111111111111", "12/25", "123", null, ACTIVE_STATUS));
                     logger.info("Seeded credit card for user 'user' id=" + user.getId());
                 }
                 User john = userRepository.findByUsername("john");
                 if (john != null) {
-                    paymentRepository.save(new Payment(john.getId(), "PAYPAL", null, null, null, "john.paypal@example.com", "ACTIVE"));
+                    paymentRepository.save(new Payment(john.getId(), "PAYPAL", null, null, null, "john.paypal@example.com", ACTIVE_STATUS));
                     logger.info("Seeded PayPal for 'john' id=" + john.getId());
                 }
                 User alice = userRepository.findByUsername("alice");
                 if (alice != null) {
                     // keep an example credit card and also add a PayPal account for alice
                     paymentRepository.save(new Payment(alice.getId(), "CREDIT_CARD", "5555555555554444", "01/26", "999", null, "INACTIVE"));
-                    paymentRepository.save(new Payment(alice.getId(), "PAYPAL", null, null, null, "alice.paypal@example.com", "ACTIVE"));
+                    paymentRepository.save(new Payment(alice.getId(), "PAYPAL", null, null, null, "alice.paypal@example.com", ACTIVE_STATUS));
                 }
             } catch (Exception e) {
                 logger.error("Error seeding payments", e);
             }
             try {
-                // find payments and create a few transactions per payment so UI shows history
-                for (Payment p : paymentRepository.findAll()) {
-                    try {
-                        logger.info("Seeding transactions for payment id=" + p.getId() + " userId=" + p.getUserId());
-                        // create a few sample transactions with varying amounts/statuses
-                        Transaction t1 = new Transaction(p.getId(), 12.34, "APPROVED");
-                        Transaction t2 = new Transaction(p.getId(), 5.00, "APPROVED");
-                        Transaction t3 = new Transaction(p.getId(), 2.50, "DECLINED");
-                        transactionRepository.save(t1);
-                        transactionRepository.save(t2);
-                        transactionRepository.save(t3);
-                        logger.info("Saved 3 transactions for payment id=" + p.getId());
-                    } catch (Exception inner) {
-                        logger.error("Failed to seed transactions for payment id=" + p.getId(), inner);
-                    }
+                for (Payment payment
+                        : paymentRepository.findAll()) {
+
+                    seedTransactionsForPayment(
+                            payment,
+                            transactionRepository);
                 }
-            } catch (Exception e) {
-                logger.error("Error seeding transactions", e);
+            } catch (Exception exception) {
+                logger.error(
+                        "Error seeding transactions",
+                        exception);
             }
         };
+    }
+
+    private void seedTransactionsForPayment(
+            Payment payment,
+            TransactionRepository transactionRepository) {
+
+        try {
+            logger.info(
+                    "Seeding transactions for payment id="
+                            + payment.getId()
+                            + " userId="
+                            + payment.getUserId());
+
+            Transaction firstTransaction =
+                    new Transaction(
+                            payment.getId(),
+                            12.34,
+                            "APPROVED");
+
+            Transaction secondTransaction =
+                    new Transaction(
+                            payment.getId(),
+                            5.00,
+                            "APPROVED");
+
+            Transaction thirdTransaction =
+                    new Transaction(
+                            payment.getId(),
+                            2.50,
+                            "DECLINED");
+
+            transactionRepository.save(firstTransaction);
+            transactionRepository.save(secondTransaction);
+            transactionRepository.save(thirdTransaction);
+
+            logger.info(
+                    "Saved 3 transactions for payment id="
+                            + payment.getId());
+        } catch (Exception exception) {
+            logger.error(
+                    "Failed to seed transactions for payment id="
+                            + payment.getId(),
+                    exception);
+        }
     }
 }

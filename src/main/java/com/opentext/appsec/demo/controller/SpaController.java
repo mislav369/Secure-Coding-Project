@@ -8,7 +8,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
+
+import org.springframework.web.bind.annotation.GetMapping;
+
+import org.springframework.web.bind.annotation.PathVariable;
 
 @Controller
 public class SpaController {
@@ -25,23 +28,25 @@ public class SpaController {
      * cause DispatcherServlet re-dispatch loops in some environments.
      */
     // Do NOT match the root path here; require at least one character in the path.
-    @RequestMapping({
+    @GetMapping({
         "/{path:^(?!(?:api|actuator|v3|swagger-ui|swagger|webjars|assets|static|favicon))[^.].+}",
         "/{path:^(?!(?:api|actuator|v3|swagger-ui|swagger|webjars|assets|static|favicon))[^.].+}/**"
     })
-    public ResponseEntity<Resource> forward(HttpServletRequest request) {
+    public ResponseEntity<Resource> forward(
+            @PathVariable("path") String path,
+            HttpServletRequest request) {
         String uri = request.getRequestURI();
 
         // Attempt to serve the request as a static resource if it exists
         Resource resource = resourceLoader.getResource("classpath:/static" + uri);
-        if (resource != null && resource.exists()) {
+        if (resource.exists()) {
             MediaType mt = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
             return ResponseEntity.ok().contentType(mt).body(resource);
         }
 
         // For client-side routes, serve the SPA index.html directly (no forward)
         Resource index = resourceLoader.getResource("classpath:/static/index.html");
-        if (index != null && index.exists()) {
+        if (index.exists()) {
             return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(index);
         }
 

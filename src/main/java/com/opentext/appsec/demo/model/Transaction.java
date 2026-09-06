@@ -2,6 +2,7 @@ package com.opentext.appsec.demo.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /**
  * Entity representing a transaction.
@@ -28,7 +29,7 @@ public class Transaction {
         this.paymentId = paymentId;
         this.amount = amount;
         this.status = status;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public Long getId() { return id; }

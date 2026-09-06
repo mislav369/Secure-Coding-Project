@@ -1,6 +1,5 @@
 package com.opentext.appsec.demo.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +10,8 @@ import java.io.IOException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 
+import java.nio.file.NoSuchFileException;
+
 /**
  * File controller with intentional security vulnerabilities.
  */
@@ -18,8 +19,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 @RequestMapping("/api/files")
 public class FileController {
 
-    @Autowired
-    private FileService fileService;
+    private final FileService fileService;
+
+    private static final String ERROR_PREFIX = "Error: ";
+
+    public FileController(FileService fileService) {
+        this.fileService = fileService;
+    }
 
     /**
      * Read file with path traversal vulnerability.
@@ -33,7 +39,7 @@ public class FileController {
             return ResponseEntity.ok(content);
         } catch (IOException e) {
             // Information disclosure - exposing stack trace
-            return ResponseEntity.status(500).body("Error: " + e.getMessage() + "\n" + java.util.Arrays.toString(e.getStackTrace()));
+            return ResponseEntity.status(500).body(ERROR_PREFIX + e.getMessage() + "\n" + java.util.Arrays.toString(e.getStackTrace()));
         }
     }
 
@@ -48,7 +54,7 @@ public class FileController {
             fileService.writeFile(filename, content);
             return ResponseEntity.ok("File written successfully: " + filename);
         } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            return ResponseEntity.status(500).body(ERROR_PREFIX + e.getMessage());
         }
     }
 
@@ -63,7 +69,7 @@ public class FileController {
             String output = fileService.executeCommand(cmd);
             return ResponseEntity.ok(output);
         } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            return ResponseEntity.status(500).body(ERROR_PREFIX + e.getMessage());
         }
     }
 
@@ -78,7 +84,7 @@ public class FileController {
             String output = fileService.executeShellCommand(input);
             return ResponseEntity.ok(output);
         } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            return ResponseEntity.status(500).body(ERROR_PREFIX + e.getMessage());
         }
     }
 
@@ -93,7 +99,7 @@ public class FileController {
             String content = fileService.readAbsolutePath(path);
             return ResponseEntity.ok(content);
         } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            return ResponseEntity.status(500).body(ERROR_PREFIX + e.getMessage());
         }
     }
 
@@ -102,12 +108,19 @@ public class FileController {
      */
     @Operation(summary = "Delete file (path traversal demo)", security = {@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")})
     @DeleteMapping("/delete")
-    public ResponseEntity<String> deleteFile(@Parameter(description = "Filename to delete (unsafe)") @RequestParam String filename) {
-        // Path Traversal vulnerability - could delete system files
-        boolean deleted = fileService.deleteFile(filename);
-        if (deleted) {
-            return ResponseEntity.ok("File deleted: " + filename);
+    public ResponseEntity<String> deleteFile(
+            @RequestParam String filename) {
+
+        try {
+            fileService.deleteFile(filename);
+            return ResponseEntity.ok(
+                    "File deleted: " + filename);
+        } catch (NoSuchFileException exception) {
+            return ResponseEntity.status(404).body(
+                    "File not found: " + filename);
+        } catch (IOException exception) {
+            return ResponseEntity.status(500).body(
+                    ERROR_PREFIX + exception.getMessage());
         }
-        return ResponseEntity.status(404).body("File not found: " + filename);
     }
 }

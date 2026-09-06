@@ -2,20 +2,25 @@ package com.opentext.appsec.demo.controller;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.opentext.appsec.demo.model.Payment;
 import com.opentext.appsec.demo.model.Transaction;
 import com.opentext.appsec.demo.repository.PaymentRepository;
-import com.opentext.appsec.demo.repository.UserRepository;
+import com.opentext.appsec.demo.repository.TransactionRepository;
+
 
 import java.util.List;
 import java.time.LocalDateTime;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+
+import com.opentext.appsec.demo.dto.PaymentRequest;
+
+import java.time.ZoneOffset;
 
 /**
  * Payment controller exposing insecure demo endpoints.
@@ -26,14 +31,17 @@ public class PaymentController {
 
     private static final Log logger = LogFactory.getLog(PaymentController.class);
 
-    @Autowired
-    private PaymentRepository paymentRepository;
+    private static final String CREDIT_CARD_TYPE = "CREDIT_CARD";
 
-    @Autowired
-    private com.opentext.appsec.demo.repository.TransactionRepository transactionRepository;
+    private final PaymentRepository paymentRepository;
+    private final TransactionRepository transactionRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    public PaymentController(
+            PaymentRepository paymentRepository,
+            TransactionRepository transactionRepository) {
+        this.paymentRepository = paymentRepository;
+        this.transactionRepository = transactionRepository;
+    }
 
     /**
      * Get all payments - returns full payment details including card numbers and CVV in plain text for demo purposes.
@@ -57,22 +65,32 @@ public class PaymentController {
     /**
      * Create a payment method - accepts and stores card data in plain text for demo purposes.
      */
-    @Operation(summary = "Create a payment method (INSECURE: stores card data in plain text)")
+    @Operation(summary = "Create a payment method")
     @PostMapping
-    public Payment createPayment(@RequestBody Payment payment) {
-        // Normalize and set defaults so client-created payments look like sample data
+    public Payment createPayment(@RequestBody PaymentRequest request) {
+        // Map only the client-provided fields onto a new entity to prevents mass assignment
+        Payment payment = new Payment();
+        payment.setUserId(request.userId());
+        payment.setType(request.type());
+        payment.setCardNumber(request.cardNumber());
+        payment.setCardExpiry(request.cardExpiry());
+        payment.setCvv(request.cvv());
+        payment.setPaypalEmail(request.paypalEmail());
+
         if (payment.getType() != null) {
             String t = payment.getType().toUpperCase();
-            if (t.equals("CARD") || t.equals("CREDIT_CARD")) payment.setType("CREDIT_CARD");
+            if (t.equals("CARD") || t.equals(CREDIT_CARD_TYPE)) {
+                payment.setType(CREDIT_CARD_TYPE);
+            }
             else if (t.equals("PAYPAL")) payment.setType("PAYPAL");
             else payment.setType(t);
         } else {
-            payment.setType("CREDIT_CARD");
+            payment.setType(CREDIT_CARD_TYPE);
         }
-        if (payment.getStatus() == null) payment.setStatus("ACTIVE");
-        if (payment.getCreatedAt() == null) payment.setCreatedAt(LocalDateTime.now());
 
-        // INSECURE (intentional): storing payment data including card details in plain text for demo.
+        payment.setStatus("ACTIVE");
+        payment.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC));
+
         return paymentRepository.save(payment);
     }
 
@@ -81,7 +99,7 @@ public class PaymentController {
      */
     @Operation(summary = "Delete a payment method")
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePayment(@PathVariable Long id) {
+    public ResponseEntity<Void> deletePayment(@PathVariable Long id){
         if (!paymentRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }

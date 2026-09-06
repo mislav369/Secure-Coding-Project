@@ -6,6 +6,9 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import org.springframework.beans.factory.annotation.Value;
+import java.nio.file.Path;
+
 /**
  * File service with intentional security vulnerabilities.
  */
@@ -13,7 +16,14 @@ import java.nio.file.Paths;
 public class FileService {
 
     // Hardcoded path - security issue
-    private static final String BASE_PATH = "/tmp/uploads/";
+    private final Path basePath;
+
+    public FileService(
+            @Value("${app.file.base-path}") String basePath) {
+        this.basePath = Paths.get(basePath)
+                .toAbsolutePath()
+                .normalize();
+    }
 
     /**
      * Read file with path traversal vulnerability.
@@ -21,7 +31,7 @@ public class FileService {
      */
     public String readFile(String filename) throws IOException {
         // Path Traversal vulnerability - no validation of filename
-        File file = new File(BASE_PATH + filename);
+        File file = basePath.resolve(filename).toFile();
         return new String(Files.readAllBytes(file.toPath()));
     }
 
@@ -30,7 +40,7 @@ public class FileService {
      */
     public void writeFile(String filename, String content) throws IOException {
         // Path Traversal vulnerability
-        File file = new File(BASE_PATH + filename);
+        File file = basePath.resolve(filename).toFile();
         Files.write(file.toPath(), content.getBytes());
     }
 
@@ -77,9 +87,8 @@ public class FileService {
     /**
      * Delete file without validation.
      */
-    public boolean deleteFile(String filename) {
-        // Path Traversal vulnerability - could delete system files
-        File file = new File(BASE_PATH + filename);
-        return file.delete();
+    public void deleteFile(String filename) throws IOException {
+        File file = basePath.resolve(filename).toFile();
+        Files.delete(file.toPath());
     }
 }

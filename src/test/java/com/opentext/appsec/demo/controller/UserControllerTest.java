@@ -1,6 +1,6 @@
 package com.opentext.appsec.demo.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.opentext.appsec.demo.model.User;
 import com.opentext.appsec.demo.service.UserService;
 import com.opentext.appsec.demo.security.JwtUtil;
@@ -8,10 +8,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.test.util.ReflectionTestUtils;
+
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import com.opentext.appsec.demo.security.TokenBlacklistService;
 
 import java.util.List;
 
@@ -28,14 +30,18 @@ class UserControllerTest {
 
     private UserController controller;
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    private TokenBlacklistService blacklistService;
 
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
-        controller = new UserController();
-        ReflectionTestUtils.setField(controller, "userService", userService);
-        ReflectionTestUtils.setField(controller, "jwtUtil", jwtUtil);
+        controller = new UserController(
+                userService,
+                jwtUtil,
+                blacklistService
+        );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }

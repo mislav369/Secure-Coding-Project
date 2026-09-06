@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 
+import java.time.ZoneOffset;
+
 /**
  * Payment entity for demo purposes.
  */
@@ -51,7 +53,7 @@ public class Payment {
         this.cvv = cvv;
         this.paypalEmail = paypalEmail;
         this.status = status;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     public Long getId() {

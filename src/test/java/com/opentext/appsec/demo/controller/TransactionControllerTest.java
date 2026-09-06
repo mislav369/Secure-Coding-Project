@@ -1,6 +1,6 @@
 package com.opentext.appsec.demo.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.opentext.appsec.demo.model.Transaction;
 import com.opentext.appsec.demo.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,13 +24,11 @@ class TransactionControllerTest {
 
     private TransactionController controller;
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
-        controller = new TransactionController();
-        org.springframework.test.util.ReflectionTestUtils.setField(controller, "transactionRepository", transactionRepository);
+        controller = new TransactionController(transactionRepository);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

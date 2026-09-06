@@ -51,18 +51,7 @@ public class EntraTokenService {
         String cleanToken = token.startsWith("Bearer ") ? token.substring(7) : token;
 
         try {
-            Jwt jwt;
-            try {
-                jwt = jwtDecoder.decode(cleanToken);
-            } catch (JwtException primaryException) {
-                boolean issuerMismatch = primaryException.getMessage() != null
-                        && primaryException.getMessage().toLowerCase().contains("iss claim is not valid");
-                if (issuerMismatch && relaxedJwtDecoder != null) {
-                    jwt = relaxedJwtDecoder.decode(cleanToken);
-                } else {
-                    throw primaryException;
-                }
-            }
+            Jwt jwt = decodeToken(cleanToken);
 
             // Extract username from claims
             // Entra typically uses 'preferred_username' or 'upn' for user identity
@@ -78,6 +67,7 @@ public class EntraTokenService {
         } catch (JwtException e) {
             throw new JwtException("Invalid or expired Entra token: " + e.getMessage(), e);
         }
+
     }
 
     /**
@@ -85,5 +75,22 @@ public class EntraTokenService {
      */
     public boolean isEntraEnabled() {
         return issuerUri != null && !issuerUri.isBlank();
+    }
+    private Jwt decodeToken(String token) throws JwtException {
+        try {
+            return jwtDecoder.decode(token);
+        } catch (JwtException primaryException) {
+            boolean issuerMismatch =
+                    primaryException.getMessage() != null
+                            && primaryException.getMessage()
+                            .toLowerCase()
+                            .contains("iss claim is not valid");
+
+            if (issuerMismatch && relaxedJwtDecoder != null) {
+                return relaxedJwtDecoder.decode(token);
+            }
+
+            throw primaryException;
+        }
     }
 }
