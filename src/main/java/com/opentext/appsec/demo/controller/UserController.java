@@ -155,8 +155,8 @@ public class UserController {
         if (!authenticated) {
             return ResponseEntity.status(401).build();
         }
-
-        String accessToken = jwtUtil.generateToken(username);
+        User user = userService.findUserByUsername(username);
+        String accessToken = jwtUtil.generateToken(username, user.getRole());
 
         String refreshToken = refreshTokenService
                 .createForLogin(username)
@@ -184,9 +184,11 @@ public class UserController {
             RefreshToken rotated =
                     refreshTokenService.rotateToken(
                             request.refreshToken());
-
-            String accessToken = jwtUtil.generateToken(
+            User user = userService.findUserByUsername(
                     rotated.getUsername());
+            String accessToken = jwtUtil.generateToken(
+                    rotated.getUsername(),
+                    user.getRole());
 
             return ResponseEntity.ok(
                     new TokenResponse(

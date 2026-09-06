@@ -46,12 +46,20 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/users/login", "/api/users/refresh", "/api/users/debug/credentials").permitAll()
+                        .requestMatchers(
+                                "/api/users/login",
+                                "/api/users/refresh"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/api/users/debug/credentials"
+                        ).hasRole("ADMIN")
                     .requestMatchers("/api/auth/entra/exchange").permitAll()
-                    // Allow anonymous registration
+
                     .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )

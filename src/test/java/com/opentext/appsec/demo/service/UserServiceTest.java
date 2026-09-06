@@ -9,12 +9,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -25,53 +33,223 @@ class UserServiceTest {
     @Mock
     private EntityManager entityManager;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private UserService userService;
 
     @Test
-    void authenticateUser_successAndFailure() {
-        User user = new User("bob", "secret", "bob@example.com", "USER");
-        when(userRepository.findByUsername("bob")).thenReturn(user);
+    void shouldAuthenticateValidUser() {
+        User user = new User(
+                "admin",
+                "encodedPassword",
+                "admin@example.com",
+                "ADMIN");
 
-        assertTrue(userService.authenticateUser("bob", "secret"));
-        assertFalse(userService.authenticateUser("bob", "wrong"));
+        when(userRepository.findByUsername("admin"))
+                .thenReturn(user);
+
+        when(passwordEncoder.matches(
+                "admin123",
+                "encodedPassword"))
+                .thenReturn(true);
+
+        assertTrue(
+                userService.authenticateUser(
+                        "admin",
+                        "admin123"));
     }
 
     @Test
-    void createUser_and_getAllUsers() {
-        User u1 = new User("a","p","a@e","USER");
-        when(userRepository.save(u1)).thenReturn(u1);
-        when(userRepository.findAll()).thenReturn(List.of(u1));
+    void shouldRejectWrongPassword() {
+        User user = new User(
+                "admin",
+                "encodedPassword",
+                "admin@example.com",
+                "ADMIN");
 
-        User created = userService.createUser(u1);
-        assertSame(u1, created);
+        when(userRepository.findByUsername("admin"))
+                .thenReturn(user);
 
-        List<User> all = userService.getAllUsers();
-        assertEquals(1, all.size());
-        assertEquals("a", all.get(0).getUsername());
+        when(passwordEncoder.matches(
+                "wrong",
+                "encodedPassword"))
+                .thenReturn(false);
+
+        assertFalse(
+                userService.authenticateUser(
+                        "admin",
+                        "wrong"));
     }
 
     @Test
-    void findUserByUsername_usesEntityManager() {
-        User u = new User("x","p","x@e","USER");
-        Query q = mock(Query.class);
-        when(entityManager.createNativeQuery(anyString(), eq(User.class))).thenReturn(q);
-        when(q.getResultList()).thenReturn(List.of(u));
+    void shouldRejectUnknownUser() {
+        when(userRepository.findByUsername("unknown"))
+                .thenReturn(null);
 
-        User res = userService.findUserByUsername("x");
-        assertNotNull(res);
-        assertEquals("x", res.getUsername());
+        assertFalse(
+                userService.authenticateUser(
+                        "unknown",
+                        "password"));
+
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test
-    void searchUsers_usesEntityManager() {
-        User u = new User("s","p","s@e","USER");
-        Query q = mock(Query.class);
-        when(entityManager.createNativeQuery(anyString(), eq(User.class))).thenReturn(q);
-        when(q.getResultList()).thenReturn(List.of(u));
+    void shouldCreateUserWithEncodedPassword() {
+        User user = new User(
+                "newuser",
+                "plainPassword",
+                "new@example.com",
+                "USER");
 
-        List<User> results = userService.searchUsers("s");
-        assertEquals(1, results.size());
-        assertEquals("s", results.get(0).getUsername());
+        when(passwordEncoder.encode("plainPassword"))
+                .thenReturn("encodedPassword");
+
+        when(userRepository.save(user))
+                .thenReturn(user);
+
+        User created =
+                userService.createUser(user);
+
+        assertSame(user, created);
+
+        assertEquals(
+                "encodedPassword",
+                created.getPassword());
+    }
+
+    @Test
+    void shouldUpdateUserPassword() {
+        User user = new User(
+                "user",
+                "oldPassword",
+                "user@example.com",
+                "USER");
+
+        when(passwordEncoder.encode("newPassword"))
+                .thenReturn("encodedNewPassword");
+
+        when(userRepository.save(user))
+                .thenReturn(user);
+
+        User updated =
+                userService.updateUser(
+                        user,
+                        "newPassword");
+
+        assertEquals(
+                "encodedNewPassword",
+                updated.getPassword());
+    }
+
+    @Test
+    void shouldReturnAllUsers() {
+        User user = new User(
+                "user",
+                "password",
+                "user@example.com",
+                "USER");
+
+        when(userRepository.findAll())
+                .thenReturn(List.of(user));
+
+        List<User> users =
+                userService.getAllUsers();
+
+        assertEquals(1, users.size());
+        assertEquals(
+                "user",
+                users.get(0).getUsername());
+    }
+
+    @Test
+    void shouldFindUserUsingParameterizedQuery() {
+        User user = new User(
+                "alice",
+                "password",
+                "alice@example.com",
+                "USER");
+
+        Query query = org.mockito.Mockito.mock(Query.class);
+
+        when(entityManager.createNativeQuery(
+                anyString(),
+                eq(User.class)))
+                .thenReturn(query);
+
+        when(query.setParameter(
+                "username",
+                "alice"))
+                .thenReturn(query);
+
+        when(query.getResultList())
+                .thenReturn(List.of(user));
+
+        User result =
+                userService.findUserByUsername("alice");
+
+        assertEquals("alice", result.getUsername());
+
+        verify(query).setParameter(
+                "username",
+                "alice");
+    }
+
+    @Test
+    void shouldReturnNullWhenUserIsNotFound() {
+        Query query = org.mockito.Mockito.mock(Query.class);
+
+        when(entityManager.createNativeQuery(
+                anyString(),
+                eq(User.class)))
+                .thenReturn(query);
+
+        when(query.setParameter(
+                "username",
+                "missing"))
+                .thenReturn(query);
+
+        when(query.getResultList())
+                .thenReturn(List.of());
+
+        User result =
+                userService.findUserByUsername("missing");
+
+        assertNull(result);
+    }
+
+    @Test
+    void shouldSearchUsersUsingParameterizedQuery() {
+        User user = new User(
+                "alice",
+                "password",
+                "alice@example.com",
+                "USER");
+
+        Query query = org.mockito.Mockito.mock(Query.class);
+
+        when(entityManager.createNativeQuery(
+                anyString(),
+                eq(User.class)))
+                .thenReturn(query);
+
+        when(query.setParameter(
+                "searchTerm",
+                "%ali%"))
+                .thenReturn(query);
+
+        when(query.getResultList())
+                .thenReturn(List.of(user));
+
+        List<User> result =
+                userService.searchUsers("ali");
+
+        assertEquals(1, result.size());
+
+        verify(query).setParameter(
+                "searchTerm",
+                "%ali%");
     }
 }

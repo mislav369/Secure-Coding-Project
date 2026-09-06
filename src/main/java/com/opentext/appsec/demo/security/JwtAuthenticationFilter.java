@@ -12,7 +12,6 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 
 // INSECURE (intentional): Simple JWT auth filter for demo purposes.
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -33,7 +32,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Check blacklist first
             if (!blacklistService.isBlacklisted(token) && jwtUtil.validateToken(token)) {
                 String username = jwtUtil.getUsernameFromToken(token);
-                UserDetails userDetails = User.withUsername(username).password("N/A").authorities(Collections.emptyList()).build();
+                String role = jwtUtil.getRoleFromToken(token);
+
+                String authority = role.startsWith("ROLE_")
+                        ? role
+                        : "ROLE_" + role;
+
+                UserDetails userDetails = User.withUsername(username)
+                        .password("N/A")
+                        .authorities(authority)
+                        .build();
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
